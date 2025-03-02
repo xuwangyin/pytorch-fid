@@ -268,9 +268,22 @@ def compute_statistics_of_path(path, model, batch_size, dims, device, num_worker
             m, s = f["mu"][:], f["sigma"][:]
     else:
         path = pathlib.Path(path)
-        files = sorted(
-            [file for ext in IMAGE_EXTENSIONS for file in path.rglob("*.{}".format(ext))]
-        )
+        # Use os.walk to follow symbolic links instead of path.rglob
+        files = []
+        for root, _, filenames in os.walk(path, followlinks=True):
+            for filename in filenames:
+                file_path = os.path.join(root, filename)
+                # Get file extension
+                ext = os.path.splitext(filename)[1].lower().lstrip(".")
+                if ext in IMAGE_EXTENSIONS:
+                    files.append(file_path)
+
+        # Sort files for consistency
+        files = sorted(files)
+
+        if len(files) == 0:
+            raise RuntimeError(f"No supported image files found in {path}")
+
         m, s = calculate_activation_statistics(
             files, model, batch_size, dims, device, num_workers
         )
